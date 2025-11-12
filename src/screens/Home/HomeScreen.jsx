@@ -3,13 +3,12 @@ import {View,Text,TouchableOpacity,StyleSheet,SafeAreaView,FlatList,StatusBar} f
 import MainHeader from '../../components/Home/MainHeader'
 import SearchHeader from '../../components/Home/SearchHeader'
 import { Ionicons } from '@react-native-vector-icons/ionicons';
+import { useNavigation } from '@react-navigation/native';
 
-
-
-const HomeScreen = ({ navigation }) => {
+const HomeScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
-
+const navigation = useNavigation();
   // Sample users data
   const [users, setUsers] = useState([
     {
@@ -99,11 +98,19 @@ const HomeScreen = ({ navigation }) => {
     user.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-
+  // Function to handle user click
+  const handleUserPress = (user) => {
+    navigation.navigate('ChatScreen', { 
+      user: user,
+      userName: user.name, // You can pass specific data you need
+      userId: user.id
+    });
+  };
 
   const renderUserItem = ({ item }) => (
     <TouchableOpacity
       style={styles.userItem}
+      onPress={() => handleUserPress(item)} // Add onPress handler
     >
       <View style={styles.avatarContainer}>
         <Text style={styles.avatar}>{item.avatar}</Text>
@@ -132,9 +139,6 @@ const HomeScreen = ({ navigation }) => {
       </View>
     </TouchableOpacity>
   );
-
-  
-  
 
   return (
     <SafeAreaView style={styles.container}>
@@ -184,6 +188,7 @@ const HomeScreen = ({ navigation }) => {
   );
 };
 
+// ... keep your existing styles the same ...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -329,36 +334,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-start',
-    paddingTop: 60,
-    alignItems: 'flex-end',
-    paddingRight: 16,
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 8,
-    minWidth: 200,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-  },
-  modalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    gap: 12,
-  },
-  modalItemText: {
-    fontSize: 16,
-    color: '#000',
-    fontWeight: '500',
   },
   fab: {
     position: 'absolute',
