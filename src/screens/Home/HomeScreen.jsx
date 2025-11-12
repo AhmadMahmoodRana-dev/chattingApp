@@ -1,58 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TextInput,
-  Image,
-  Alert,
-  FlatList,
-  StatusBar,
-  Dimensions,
-  Modal,
-} from 'react-native';
+import React, { useState} from 'react';
+import {View,Text,TouchableOpacity,StyleSheet,SafeAreaView,FlatList,StatusBar} from 'react-native';
+import MainHeader from '../../components/Home/MainHeader'
+import SearchHeader from '../../components/Home/SearchHeader'
+import { Ionicons } from '@react-native-vector-icons/ionicons';
 
-const { width, height } = Dimensions.get('window');
 
-// Custom Icon Component using Text with emoji/icons
-const Icon = ({ name, size = 24, color = '#000', style, onPress }) => {
-  const icons = {
-    search: '🔍',
-    dots: '⋯',
-    camera: '📷',
-    edit: '✏️',
-    add: '➕',
-    group: '👥',
-    broadcast: '📢',
-    settings: '⚙️',
-    status: '●',
-    check: '✓',
-    back: '←',
-    send: '➤',
-    close: '✕',
-    menu: '☰',
-  };
-
-  return (
-    <TouchableOpacity onPress={onPress} disabled={!onPress}>
-      <Text style={[{
-        fontSize: size,
-        color: color,
-      }, style]}>
-        {icons[name] || '❓'}
-      </Text>
-    </TouchableOpacity>
-  );
-};
 
 const HomeScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
 
   // Sample users data
   const [users, setUsers] = useState([
@@ -110,77 +66,44 @@ const HomeScreen = ({ navigation }) => {
       isOnline: true,
       avatar: '🤖',
     },
+    {
+      id: '7',
+      name: 'Tech Support',
+      status: 'We are here to help',
+      lastSeen: 'Always online',
+      unreadCount: 0,
+      isOnline: true,
+      avatar: '🤖',
+    },
+    {
+      id: '8',
+      name: 'Tech Support',
+      status: 'We are here to help',
+      lastSeen: 'Always online',
+      unreadCount: 0,
+      isOnline: true,
+      avatar: '🤖',
+    },
+    {
+      id: '9',
+      name: 'Tech Support',
+      status: 'We are here to help',
+      lastSeen: 'Always online',
+      unreadCount: 0,
+      isOnline: true,
+      avatar: '🤖',
+    },
   ]);
 
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleUserPress = (user) => {
-    Alert.alert(
-      'Start Chat',
-      `Start chatting with ${user.name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Open Chat', 
-          onPress: () => {
-            // Navigate to chat screen
-            // navigation.navigate('Chat', { user });
-          }
-        },
-      ]
-    );
-  };
 
-  const handleAddContact = () => {
-    Alert.prompt(
-      'Add New Contact',
-      'Enter phone number or username:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Add',
-          onPress: (contact) => {
-            if (contact) {
-              const newUser = {
-                id: Date.now().toString(),
-                name: contact,
-                status: 'Hey there! I am using ChatApp',
-                lastSeen: 'Just now',
-                unreadCount: 0,
-                isOnline: true,
-                avatar: '👤',
-              };
-              setUsers(prev => [newUser, ...prev]);
-              Alert.alert('Success', 'Contact added successfully!');
-            }
-          },
-        },
-      ]
-    );
-    setShowAddModal(false);
-  };
-
-  const handleNewGroup = () => {
-    Alert.alert('New Group', 'Create a new group chat feature');
-    setShowAddModal(false);
-  };
-
-  const handleNewBroadcast = () => {
-    Alert.alert('New Broadcast', 'Create a new broadcast list');
-    setShowAddModal(false);
-  };
-
-  const handleSettings = () => {
-    Alert.alert('Settings', 'Open app settings');
-  };
 
   const renderUserItem = ({ item }) => (
     <TouchableOpacity
       style={styles.userItem}
-      onPress={() => handleUserPress(item)}
-      onLongPress={() => setSelectedUser(item)}
     >
       <View style={styles.avatarContainer}>
         <Text style={styles.avatar}>{item.avatar}</Text>
@@ -210,69 +133,19 @@ const HomeScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <View style={styles.headerLeft}>
-        <Text style={styles.appTitle}>ChatApp</Text>
-      </View>
-      
-      <View style={styles.headerRight}>
-        <Icon 
-          name="search" 
-          size={22} 
-          color="#fff" 
-          onPress={() => setShowSearch(true)}
-        />
-        <Icon 
-          name="dots" 
-          size={28} 
-          color="#fff" 
-          onPress={() => setShowAddModal(true)}
-        />
-      </View>
-    </View>
-  );
-
-  const renderSearchHeader = () => (
-    <View style={styles.searchHeader}>
-      <Icon 
-        name="back" 
-        size={24} 
-        color="#075E54" 
-        onPress={() => {
-          setShowSearch(false);
-          setSearchQuery('');
-        }}
-      />
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search..."
-        placeholderTextColor="#666"
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        autoFocus
-      />
-      {searchQuery.length > 0 && (
-        <Icon 
-          name="close" 
-          size={20} 
-          color="#075E54" 
-          onPress={() => setSearchQuery('')}
-        />
-      )}
-    </View>
-  );
+  
+  
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#075E54" barStyle="light-content" />
+      <StatusBar backgroundColor="#191717" barStyle="light-content" />
       
-      {showSearch ? renderSearchHeader() : renderHeader()}
+      {showSearch ? <SearchHeader searchQuery={searchQuery} setSearchQuery={setSearchQuery} setShowSearch={setShowSearch} /> : <MainHeader setShowSearch={setShowSearch}  />}
 
       {/* Tabs Section */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity style={styles.tabButton}>
-          <Icon name="camera" size={24} color="#666" />
+          <Ionicons name="camera" size={24} color="#fff" />
         </TouchableOpacity>
         
         <View style={styles.tabs}>
@@ -288,7 +161,7 @@ const HomeScreen = ({ navigation }) => {
         </View>
         
         <TouchableOpacity style={styles.tabButton}>
-          <Icon name="edit" size={20} color="#666" onPress={handleAddContact} />
+          <Ionicons name="pencil" size={18} color="#fff" />
         </TouchableOpacity>
       </View>
 
@@ -301,60 +174,11 @@ const HomeScreen = ({ navigation }) => {
         contentContainerStyle={styles.listContainer}
       />
 
-      {/* Add Modal */}
-      <Modal
-        visible={showAddModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowAddModal(false)}
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowAddModal(false)}
-        >
-          <View style={styles.modalContent}>
-            <TouchableOpacity 
-              style={styles.modalItem}
-              onPress={handleNewGroup}
-            >
-              <Icon name="group" size={24} color="#075E54" />
-              <Text style={styles.modalItemText}>New Group</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.modalItem}
-              onPress={handleNewBroadcast}
-            >
-              <Icon name="broadcast" size={24} color="#075E54" />
-              <Text style={styles.modalItemText}>New Broadcast</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.modalItem}
-              onPress={handleAddContact}
-            >
-              <Icon name="add" size={24} color="#075E54" />
-              <Text style={styles.modalItemText}>New Contact</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.modalItem}
-              onPress={handleSettings}
-            >
-              <Icon name="settings" size={24} color="#075E54" />
-              <Text style={styles.modalItemText}>Settings</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
       {/* Floating Action Button */}
       <TouchableOpacity 
         style={styles.fab}
-        onPress={() => setShowAddModal(true)}
       >
-        <Icon name="add" size={28} color="#fff" />
+        <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -369,7 +193,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#075E54',
+    backgroundColor: '#191717',
     paddingHorizontal: 16,
     paddingVertical: 12,
     elevation: 4,
@@ -391,28 +215,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 20,
   },
-  searchHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#075E54',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    elevation: 4,
-  },
-  searchInput: {
-    flex: 1,
-    backgroundColor: '#fff',
-    marginHorizontal: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    fontSize: 16,
-    color: '#000',
-  },
+  
   tabsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#075E54',
+    backgroundColor: '#191717',
     paddingHorizontal: 8,
     borderBottomWidth: 0.5,
     borderBottomColor: '#ccc',
@@ -442,7 +249,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   listContainer: {
-    paddingBottom: 80,
+    paddingBottom: 10,
   },
   userItem: {
     flexDirection: 'row',
@@ -473,7 +280,7 @@ const styles = StyleSheet.create({
     right: 2,
     width: 14,
     height: 14,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#191717',
     borderWidth: 2,
     borderColor: '#fff',
     borderRadius: 7,
@@ -510,7 +317,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   unreadBadge: {
-    backgroundColor: '#25D366',
+    backgroundColor: '#191717',
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -559,7 +366,7 @@ const styles = StyleSheet.create({
     bottom: 20,
     width: 60,
     height: 60,
-    backgroundColor: '#25D366',
+    backgroundColor: '#191717',
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
