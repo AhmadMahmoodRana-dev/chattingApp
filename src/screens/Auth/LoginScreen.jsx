@@ -1,26 +1,18 @@
 import React, { useState } from 'react';
-import {View,Text,TextInput,TouchableOpacity,StyleSheet,SafeAreaView,KeyboardAvoidingView,Platform,ScrollView,Alert,Dimensions,ActivityIndicator} from 'react-native';
-
-const Icon = ({ name, size = 24, color = '#000', style }) => {
-const icons = {message: '💬',lock: '🔒',email: '📧',eye: '👁️',eyeOff: '🙈',google: '🔴',facebook: '🔵',apple: '⚫',check: '✅',loading: '⏳'};
-
-  return (
-    <Text style={[{
-      fontSize: size,
-      color: color,
-    }, style]}>
-      {icons[name] || '❓'}
-    </Text>
-  );
-};
+import {View,Text,TextInput,TouchableOpacity,StyleSheet,SafeAreaView,KeyboardAvoidingView,Platform,ScrollView,Alert,ActivityIndicator} from 'react-native';
+import { Ionicons } from '@react-native-vector-icons/ionicons';
+import BaseUrl from '../../constant/Baseurl';
+import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
 
 const LoginScreen = ({ navigation }) => {
-    
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+
+  const { login ,checkAuthStatus} = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -34,32 +26,45 @@ const LoginScreen = ({ navigation }) => {
     }
 
     setIsLoading(true);
-    
-    // Simulate API call for login
-    setTimeout(() => {
+
+    try {
+      const {data} = await axios.post(`${BaseUrl}/auth/login`, {
+        email: email.toLowerCase().trim(),
+        password: password,
+      });
+
+      console.log('Login response:', data);
+
+      if (data && data.token) {
+        // Use AuthContext login to store data
+        const success = await login(data);
+        
+        if (success) {
+          checkAuthStatus()
+        } else {
+          Alert.alert('Error', 'Failed to save login information');
+        }
+      } else {
+        Alert.alert(
+          'Login Failed',
+          data.message || 'Invalid email or password',
+        );
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert('Error', 'Unable to connect to server. Please try again.');
+    } finally {
       setIsLoading(false);
-      Alert.alert('Welcome!', 'Successfully logged in to ChatApp!');
-      // Navigate to chat screen
-      // navigation.navigate('Chat');
-    }, 1500);
+    }
   };
 
-  const isValidEmail = (email) => {
+  const isValidEmail = email => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
-  const handleForgotPassword = () => {
-    Alert.alert('Reset Password', 'We will send a password reset link to your email');
-  };
-
-  const handleSocialLogin = (provider) => {
-    Alert.alert('Social Login', `Connecting with ${provider}...`);
-  };
-
-  const handleSignUp = () => {
-    Alert.alert('Sign Up', 'Redirect to registration screen');
-    navigation.navigate('Register');
+  const handleSocialLogin = provider => {
+    Alert.alert('Social Login', `${provider} login coming soon...`);
   };
 
   return (
@@ -75,17 +80,22 @@ const LoginScreen = ({ navigation }) => {
           {/* Header Section */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Icon name="message" size={40} color="#007AFF" />
+              <Ionicons name="chatbubbles" size={40} color="#007AFF" />
             </View>
-            <Text style={styles.title}>Welcome to ChatApp</Text>
-            <Text style={styles.subtitle}>Sign in to start chatting with friends</Text>
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.subtitle}>Sign in to continue chatting</Text>
           </View>
 
           {/* Form Section */}
           <View style={styles.formContainer}>
             {/* Email Input */}
             <View style={styles.inputContainer}>
-              <Icon name="email" size={20} color="#666" style={styles.inputIcon} />
+              <Ionicons
+                name="mail-outline"
+                size={20}
+                color="#666"
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={styles.textInput}
                 placeholder="Email Address"
@@ -101,7 +111,12 @@ const LoginScreen = ({ navigation }) => {
 
             {/* Password Input */}
             <View style={styles.inputContainer}>
-              <Icon name="lock" size={20} color="#666" style={styles.inputIcon} />
+              <Ionicons
+                name="lock-closed-outline"
+                size={20}
+                color="#666"
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={styles.textInput}
                 placeholder="Password"
@@ -117,8 +132,8 @@ const LoginScreen = ({ navigation }) => {
                 style={styles.eyeIcon}
                 disabled={isLoading}
               >
-                <Icon
-                  name={showPassword ? 'eyeOff' : 'eye'}
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                   size={20}
                   color="#666"
                 />
@@ -132,20 +147,32 @@ const LoginScreen = ({ navigation }) => {
                 onPress={() => setRememberMe(!rememberMe)}
                 disabled={isLoading}
               >
-                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                  {rememberMe && <Icon name="check" size={14} color="#fff" />}
+                <View
+                  style={[
+                    styles.checkbox,
+                    rememberMe && styles.checkboxChecked,
+                  ]}
+                >
+                  {rememberMe && (
+                    <Ionicons name="checkmark" size={14} color="#fff" />
+                  )}
                 </View>
                 <Text style={styles.rememberMeText}>Remember me</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={handleForgotPassword} disabled={isLoading}>
+              <TouchableOpacity
+                disabled={isLoading}
+              >
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </TouchableOpacity>
             </View>
 
             {/* Login Button */}
             <TouchableOpacity
-              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+              style={[
+                styles.loginButton,
+                isLoading && styles.loginButtonDisabled,
+              ]}
               onPress={handleLogin}
               disabled={isLoading}
             >
@@ -155,7 +182,7 @@ const LoginScreen = ({ navigation }) => {
                   <Text style={styles.loginButtonText}>Signing In...</Text>
                 </View>
               ) : (
-                <Text style={styles.loginButtonText}>Sign In to Chat</Text>
+                <Text style={styles.loginButtonText}>Sign In</Text>
               )}
             </TouchableOpacity>
 
@@ -173,7 +200,7 @@ const LoginScreen = ({ navigation }) => {
                 onPress={() => handleSocialLogin('Google')}
                 disabled={isLoading}
               >
-                {/* <Icon name="google" size={20} color="#DB4437" /> */}
+                <Ionicons name="logo-google" size={20} color="#DB4437" />
                 <Text style={styles.socialButtonText}>Google</Text>
               </TouchableOpacity>
 
@@ -182,7 +209,7 @@ const LoginScreen = ({ navigation }) => {
                 onPress={() => handleSocialLogin('Facebook')}
                 disabled={isLoading}
               >
-                {/* <Icon name="facebook" size={10} color="#4267B2" /> */}
+                <Ionicons name="logo-facebook" size={20} color="#4267B2" />
                 <Text style={styles.socialButtonText}>Facebook</Text>
               </TouchableOpacity>
 
@@ -191,7 +218,7 @@ const LoginScreen = ({ navigation }) => {
                 onPress={() => handleSocialLogin('Apple')}
                 disabled={isLoading}
               >
-                {/* <Icon name="apple" size={20} color="#000" /> */}
+                <Ionicons name="logo-apple" size={20} color="#000" />
                 <Text style={styles.socialButtonText}>Apple</Text>
               </TouchableOpacity>
             </View>
@@ -199,7 +226,7 @@ const LoginScreen = ({ navigation }) => {
             {/* Sign Up Link */}
             <View style={styles.signUpContainer}>
               <Text style={styles.signUpText}>New to ChatApp? </Text>
-              <TouchableOpacity onPress={handleSignUp} disabled={isLoading}>
+              <TouchableOpacity onPress={() =>navigation.navigate('Register')} disabled={isLoading}>
                 <Text style={styles.signUpLink}>Create Account</Text>
               </TouchableOpacity>
             </View>
@@ -239,7 +266,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     backgroundColor: '#fff',
-    borderRadius: 50,
+    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -270,7 +297,7 @@ const styles = StyleSheet.create({
   formContainer: {
     backgroundColor: '#fff',
     borderRadius: 20,
-    padding: 15,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -278,22 +305,21 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.1,
     shadowRadius: 12,
-    // elevation: 5,
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 15,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#e9ecef',
-    overflow: 'hidden',
   },
   inputIcon: {
-    padding: 15,
+    paddingLeft: 15,
+    paddingRight: 10,
   },
   textInput: {
     flex: 1,
@@ -301,10 +327,10 @@ const styles = StyleSheet.create({
     paddingRight: 15,
     fontSize: 16,
     color: '#333',
-    fontWeight: '500',
   },
   eyeIcon: {
-    padding: 15,
+    paddingRight: 15,
+    paddingLeft: 10,
   },
   rememberForgotContainer: {
     flexDirection: 'row',
@@ -317,12 +343,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   checkbox: {
-    width: 22,
-    height: 22,
+    width: 20,
+    height: 20,
     borderWidth: 2,
     borderColor: '#ddd',
-    borderRadius: 6,
-    marginRight: 10,
+    borderRadius: 5,
+    marginRight: 8,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
@@ -334,7 +360,6 @@ const styles = StyleSheet.create({
   rememberMeText: {
     color: '#666',
     fontSize: 14,
-    fontWeight: '500',
   },
   forgotPasswordText: {
     color: '#007AFF',
@@ -343,8 +368,8 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     backgroundColor: '#007AFF',
-    borderRadius: 15,
-    paddingVertical: 18,
+    borderRadius: 12,
+    paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 24,
     shadowColor: '#007AFF',
@@ -366,25 +391,24 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#e9ecef',
   },
   dividerText: {
     color: '#999',
     paddingHorizontal: 15,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13,
   },
   socialButtonsContainer: {
     flexDirection: 'row',
@@ -397,12 +421,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: '#e9ecef',
     backgroundColor: '#fff',
-    gap: 8,
+    gap: 6,
   },
   googleButton: {
     borderColor: '#DB443720',
@@ -414,7 +438,7 @@ const styles = StyleSheet.create({
     borderColor: '#00000020',
   },
   socialButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#333',
   },
@@ -422,7 +446,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 10,
   },
   signUpText: {
     color: '#666',
@@ -441,7 +464,7 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 12,
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 18,
   },
 });
 

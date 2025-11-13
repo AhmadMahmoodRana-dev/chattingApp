@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import HomeScreen from "../screens/Home/HomeScreen";
 import ChatScreen from "../screens/Home/ChatScreen";
+import ProfileScreen from "../screens/Home/ProfileScreen";
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 
 const Tab = createBottomTabNavigator();
@@ -40,6 +41,13 @@ const TabNavigator = () => (
     <Tab.Screen
       name="Chats"
       component={HomeScreen}
+      options={{
+        tabBarActiveBackgroundColor: "#1e1e1e", // Active tab background
+      }}
+    />
+    <Tab.Screen
+      name="Profile"
+      component={ProfileScreen}
       options={{
         tabBarActiveBackgroundColor: "#1e1e1e", // Active tab background
       }}
