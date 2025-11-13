@@ -1,37 +1,20 @@
 import axios from 'axios';
 import React, { useState } from 'react';
-import {View,Text,TextInput,TouchableOpacity,StyleSheet,SafeAreaView,KeyboardAvoidingView,Platform,ScrollView,Alert,ActivityIndicator} from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import BaseUrl from '../../constant/Baseurl';
-
-const Icon = ({ name, size = 24, color = '#000', style }) => {
-  const icons = {
-    message: '💬',
-    lock: '🔒',
-    email: '📧',
-    eye: '👁️',
-    eyeOff: '🙈',
-    google: '🔴',
-    facebook: '🔵',
-    apple: '⚫',
-    check: '✅',
-    loading: '⏳',
-    user: '👤',
-  };
-
-  return (
-    <Text
-      style={[
-        {
-          fontSize: size,
-          color: color,
-        },
-        style,
-      ]}
-    >
-      {icons[name] || '❓'}
-    </Text>
-  );
-};
+import { Ionicons } from '@react-native-vector-icons/ionicons';
 
 const RegistrationScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
@@ -44,6 +27,7 @@ const RegistrationScreen = ({ navigation }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -72,7 +56,7 @@ const RegistrationScreen = ({ navigation }) => {
     if (password.length < 6) {
       Alert.alert(
         'Weak Password',
-        'Password must be at least 6 characters long',
+        'Password must be at least 6 characters long'
       );
       return false;
     }
@@ -108,10 +92,15 @@ const RegistrationScreen = ({ navigation }) => {
 
       const { data } = await axios.post(
         `${BaseUrl}/auth/register`,
-        registrationData,
+        registrationData
       );
       console.log('Registration successful:', data);
-      setFormData({ name: '', email: '', password: '', confirmPassword: ''});
+      setFormData({
+        name: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+      });
       setIsLoading(false);
       navigation.navigate('Login');
       console.log('Registering user with data:', registrationData);
@@ -142,7 +131,7 @@ const RegistrationScreen = ({ navigation }) => {
           {/* Header Section */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Icon name="message" size={40} color="#007AFF" />
+              <Ionicons name="chatbubbles" size={40} color="#007AFF" />
             </View>
             <Text style={styles.title}>Join ChatApp</Text>
             <Text style={styles.subtitle}>
@@ -154,8 +143,8 @@ const RegistrationScreen = ({ navigation }) => {
           <View style={styles.formContainer}>
             {/* Name Input */}
             <View style={styles.inputContainer}>
-              <Icon
-                name="user"
+              <Ionicons
+                name="person"
                 size={20}
                 color="#666"
                 style={styles.inputIcon}
@@ -173,8 +162,8 @@ const RegistrationScreen = ({ navigation }) => {
 
             {/* Email Input */}
             <View style={styles.inputContainer}>
-              <Icon
-                name="email"
+              <Ionicons
+                name="mail"
                 size={20}
                 color="#666"
                 style={styles.inputIcon}
@@ -194,8 +183,8 @@ const RegistrationScreen = ({ navigation }) => {
 
             {/* Password Input */}
             <View style={styles.inputContainer}>
-              <Icon
-                name="lock"
+              <Ionicons
+                name="lock-closed"
                 size={20}
                 color="#666"
                 style={styles.inputIcon}
@@ -215,8 +204,8 @@ const RegistrationScreen = ({ navigation }) => {
                 style={styles.eyeIcon}
                 disabled={isLoading}
               >
-                <Icon
-                  name={showPassword ? 'eyeOff' : 'eye'}
+                <Ionicons
+                  name={showPassword ? 'eye-off' : 'eye'}
                   size={20}
                   color="#666"
                 />
@@ -225,8 +214,8 @@ const RegistrationScreen = ({ navigation }) => {
 
             {/* Confirm Password Input */}
             <View style={styles.inputContainer}>
-              <Icon
-                name="lock"
+              <Ionicons
+                name="lock-closed"
                 size={20}
                 color="#666"
                 style={styles.inputIcon}
@@ -244,12 +233,14 @@ const RegistrationScreen = ({ navigation }) => {
                 editable={!isLoading}
               />
               <TouchableOpacity
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                onPress={() =>
+                  setShowConfirmPassword(!showConfirmPassword)
+                }
                 style={styles.eyeIcon}
                 disabled={isLoading}
               >
-                <Icon
-                  name={showConfirmPassword ? 'eyeOff' : 'eye'}
+                <Ionicons
+                  name={showConfirmPassword ? 'eye-off' : 'eye'}
                   size={20}
                   color="#666"
                 />
@@ -294,7 +285,9 @@ const RegistrationScreen = ({ navigation }) => {
               <View
                 style={[styles.checkbox, acceptTerms && styles.checkboxChecked]}
               >
-                {acceptTerms && <Icon name="check" size={14} color="#fff" />}
+                {acceptTerms && (
+                  <Ionicons name="checkmark" size={14} color="#fff" />
+                )}
               </View>
               <View style={styles.termsTextContainer}>
                 <Text style={styles.termsText}>
@@ -380,22 +373,10 @@ const RegistrationScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  keyboardAvoidingView: { flex: 1 },
+  scrollContainer: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 20 },
+  header: { alignItems: 'center', marginBottom: 30 },
   logoContainer: {
     width: 80,
     height: 80,
@@ -405,218 +386,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
     shadowColor: '#007AFF',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 8,
     borderWidth: 2,
     borderColor: '#007AFF20',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#1a1a1a', marginBottom: 8, textAlign: 'center' },
+  subtitle: { fontSize: 16, color: '#666', textAlign: 'center', lineHeight: 22 },
   formContainer: {
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 15,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 15,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    overflow: 'hidden',
-  },
-  inputIcon: {
-    padding: 15,
-  },
-  textInput: {
-    flex: 1,
-    paddingVertical: 15,
-    paddingRight: 15,
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  eyeIcon: {
-    padding: 15,
-  },
-  requirementsContainer: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  requirementsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 8,
-  },
-  requirementItem: {
-    marginBottom: 4,
-  },
-  requirementText: {
-    fontSize: 12,
-    color: '#999',
-  },
-  requirementMet: {
-    color: '#28a745',
-    fontWeight: '600',
-  },
-  termsContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 24,
-    paddingHorizontal: 4,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderWidth: 2,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    marginTop: 2,
-  },
-  checkboxChecked: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  termsTextContainer: {
-    flex: 1,
-  },
-  termsText: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  termsLink: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  registerButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 15,
-    paddingVertical: 18,
-    alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#007AFF',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  registerButtonDisabled: {
-    opacity: 0.6,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  registerButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#f0f0f0',
-  },
-  dividerText: {
-    color: '#999',
-    paddingHorizontal: 15,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  socialButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-    gap: 10,
-  },
-  socialButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#e9ecef',
-    backgroundColor: '#fff',
-    gap: 8,
-  },
-  googleButton: {
-    borderColor: '#DB443720',
-  },
-  facebookButton: {
-    borderColor: '#4267B220',
-  },
-  appleButton: {
-    borderColor: '#00000020',
-  },
-  socialButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  loginRedirectContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  loginRedirectText: {
-    color: '#666',
-    fontSize: 15,
-  },
-  loginRedirectLink: {
-    color: '#007AFF',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 15, marginBottom: 12, borderWidth: 1, borderColor: '#e9ecef', overflow: 'hidden' },
+  inputIcon: { padding: 15 },
+  textInput: { flex: 1, paddingVertical: 15, paddingRight: 15, fontSize: 16, color: '#333', fontWeight: '500' },
+  eyeIcon: { padding: 15 },
+  requirementsContainer: { backgroundColor: '#f8f9fa', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e9ecef' },
+  requirementsTitle: { fontSize: 14, fontWeight: '600', color: '#666', marginBottom: 8 },
+  requirementItem: { marginBottom: 4 },
+  requirementText: { fontSize: 12, color: '#999' },
+  requirementMet: { color: '#28a745', fontWeight: '600' },
+  termsContainer: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 24, paddingHorizontal: 4 },
+  checkbox: { width: 22, height: 22, borderWidth: 2, borderColor: '#ddd', borderRadius: 6, marginRight: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', marginTop: 2 },
+  checkboxChecked: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
+  termsTextContainer: { flex: 1 },
+  termsText: { fontSize: 14, color: '#666', lineHeight: 20 },
+  termsLink: { color: '#007AFF', fontWeight: '600' },
+  registerButton: { backgroundColor: '#007AFF', borderRadius: 15, paddingVertical: 18, alignItems: 'center', marginBottom: 24, shadowColor: '#007AFF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  registerButtonDisabled: { opacity: 0.6 },
+  loadingContainer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  registerButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold', letterSpacing: 0.5 },
+  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
+  divider: { flex: 1, height: 1, backgroundColor: '#f0f0f0' },
+  dividerText: { color: '#999', paddingHorizontal: 15, fontSize: 14, fontWeight: '500' },
+  socialButtonsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 10 },
+  socialButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#e9ecef', backgroundColor: '#fff', gap: 8 },
+  googleButton: { borderColor: '#DB443720' },
+  facebookButton: { borderColor: '#4267B220' },
+  appleButton: { borderColor: '#00000020' },
+  socialButtonText: { fontSize: 14, fontWeight: '600', color: '#333' },
+  loginRedirectContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 10 },
+  loginRedirectText: { color: '#666', fontSize: 15 },
+  loginRedirectLink: { color: '#007AFF', fontSize: 15, fontWeight: 'bold' },
 });
 
 export default RegistrationScreen;

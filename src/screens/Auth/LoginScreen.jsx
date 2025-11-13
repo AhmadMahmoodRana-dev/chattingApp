@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import {View,Text,TextInput,TouchableOpacity,StyleSheet,SafeAreaView,KeyboardAvoidingView,Platform,ScrollView,Alert,ActivityIndicator} from 'react-native';
+import {View,Text,TextInput,TouchableOpacity,StyleSheet,KeyboardAvoidingView,Platform,ScrollView,Alert,ActivityIndicator} from 'react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import BaseUrl from '../../constant/Baseurl';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
@@ -200,7 +201,7 @@ const LoginScreen = ({ navigation }) => {
                 onPress={() => handleSocialLogin('Google')}
                 disabled={isLoading}
               >
-                <Ionicons name="logo-google" size={20} color="#DB4437" />
+                {/* <Ionicons name="logo-google" size={20} color="#DB4437" /> */}
                 <Text style={styles.socialButtonText}>Google</Text>
               </TouchableOpacity>
 
@@ -209,7 +210,7 @@ const LoginScreen = ({ navigation }) => {
                 onPress={() => handleSocialLogin('Facebook')}
                 disabled={isLoading}
               >
-                <Ionicons name="logo-facebook" size={20} color="#4267B2" />
+                {/* <Ionicons name="logo-facebook" size={20} color="#4267B2" /> */}
                 <Text style={styles.socialButtonText}>Facebook</Text>
               </TouchableOpacity>
 
@@ -218,7 +219,7 @@ const LoginScreen = ({ navigation }) => {
                 onPress={() => handleSocialLogin('Apple')}
                 disabled={isLoading}
               >
-                <Ionicons name="logo-apple" size={20} color="#000" />
+                {/* <Ionicons name="logo-apple" size={20} color="#000" /> */}
                 <Text style={styles.socialButtonText}>Apple</Text>
               </TouchableOpacity>
             </View>

@@ -2,60 +2,53 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {View,Text,StyleSheet,SafeAreaView,TouchableOpacity,TextInput,FlatList,KeyboardAvoidingView,Platform,Image,StatusBar} from 'react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
+import axios from 'axios';
+import BaseUrl from '../../constant/Baseurl';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ChatScreen = ({ navigation, route }) => {
   const { user, userName, userId } = route.params;
-  const [messages, setMessages] = useState([
-    {
-      id: '1',
-      text: 'Hey there! How are you doing?',
-      time: '10:00 AM',
-      type: 'received',
-    },
-    {
-      id: '2',
-      text: "I'm good! Just finished that project we were talking about.",
-      time: '10:02 AM',
-      type: 'sent',
-    },
-    {
-      id: '3',
-      text: 'Thats awesome! Can you share the details?',
-      time: '10:03 AM',
-      type: 'received',
-    },
-    {
-      id: '4',
-      text: 'Sure, Ill send you the files in a bit.',
-      time: '10:05 AM',
-      type: 'sent',
-    },
-  ]);
+  const [conversationId, setConversationId] = useState("");
+  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  const [currentUserId, setCurrentUserId] = useState('');
   const flatListRef = useRef(null);
 
-  const sendMessage = () => {
-    if (inputText.trim() === '') return;
-    
-    const newMessage = {
-      id: Date.now().toString(),
-      text: inputText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: 'sent',
-    };
-    
-    setMessages(prev => [...prev, newMessage]);
-    setInputText('');
-    // Simulate reply after 1 second
-    setTimeout(() => {
-      const replyMessage = {
-        id: (Date.now() + 1).toString(),
-        text: "Thanks for your message! I'll get back to you soon.",
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        type: 'received',
-      };
-      setMessages(prev => [...prev, replyMessage]);
-    }, 1000);
+  const fetchMessages = async () => {
+    const token = await AsyncStorage.getItem('authToken');
+    try {
+      const { data } = await axios.get(`${BaseUrl}/${conversationId}/messages`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      console.log('Messages fetched:', data);
+      setMessages(data);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  }
+
+  const sendMessage = async () => {
+    try {
+      if (inputText.trim() === '') return;
+
+      const { data } = await axios.post(
+        `${BaseUrl}/${conversationId}/messages/send`,
+        { text: inputText, type: 'text' },
+        {
+          headers: {
+            Authorization: `Bearer ${await AsyncStorage.getItem('authToken')}`,
+          },
+        },
+      );
+      console.log('Message sent:', data);
+      setInputText('');
+      // Refresh messages after sending
+      fetchMessages();
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
   };
 
   useEffect(() => {
@@ -64,30 +57,104 @@ const ChatScreen = ({ navigation, route }) => {
     }
   }, [messages]);
 
-  const renderMessage = ({ item }) => (
-    <View style={[
-      styles.messageBubble,
-      item.type === 'sent' ? styles.sentMessage : styles.receivedMessage
-    ]}>
-      <Text style={[
-        styles.messageText,
-        item.type === 'sent' ? styles.sentMessageText : styles.receivedMessageText
-      ]}>
-        {item.text}
-      </Text>
-      <Text style={[
-        styles.timeText,
-        item.type === 'sent' ? styles.sentTimeText : styles.receivedTimeText
-      ]}>
-        {item.time}
-      </Text>
-    </View>
-  );
+  const renderMessage = ({ item }) => {
+    const isSent = item.sender._id === currentUserId;
+    const messageTime = new Date(item.createdAt).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    return (
+      <View
+        style={[
+          styles.messageBubble,
+          isSent ? styles.sentMessage : styles.receivedMessage,
+        ]}
+      >
+        <Text
+          style={[
+            styles.messageText,
+            isSent ? styles.sentMessageText : styles.receivedMessageText,
+          ]}
+        >
+          {item.text}
+        </Text>
+        <Text
+          style={[
+            styles.timeText,
+            isSent ? styles.sentTimeText : styles.receivedTimeText,
+          ]}
+        >
+          {messageTime}
+        </Text>
+      </View>
+    );
+  };
+
+  // ##################  ADD CONVERSATION   #######################
+
+  const addConversation = async () => {
+    const currentUserId = await AsyncStorage.getItem('userId');
+    const token = await AsyncStorage.getItem('authToken');
+    try {
+      const { data } = await axios.post(
+        `${BaseUrl}/conversation/add`,
+        {
+          type: 'direct',
+          members: [currentUserId, userId],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      console.log('Conversation added:', data);
+    } catch (error) {
+      console.error('Error adding conversation:', error);
+    }
+  };
+
+  // ##################  GET CONVERSATION   #######################
+
+  const getConversation = async () => {
+    const token = await AsyncStorage.getItem('authToken');
+    try {
+      const { data } = await axios.get(
+        `${BaseUrl}/conversation/get`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      setConversationId(data[0]?._id);
+      console.log('Conversation get:', data);
+    } catch (error) {
+      console.error('Error getting conversation:', error);
+    }
+  };
+
+  useEffect(() => {
+    const initializeChat = async () => {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      setCurrentUserId(storedUserId);
+      await addConversation();
+      await getConversation();
+    };
+    initializeChat();
+  }, []);
+
+  useEffect(() => {
+    if (conversationId) {
+      fetchMessages();
+    }
+  }, [conversationId]);
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#075E54" />
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
@@ -95,7 +162,7 @@ const ChatScreen = ({ navigation, route }) => {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => navigation.goBack()}
               style={styles.backButton}
             >
@@ -125,20 +192,20 @@ const ChatScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
         </View>
-        
+
         {/* Chat Messages */}
         <View style={styles.chatContainer}>
           <FlatList
             ref={flatListRef}
             data={messages}
             renderItem={renderMessage}
-            keyExtractor={item => item.id}
+            keyExtractor={item => item._id}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.messagesList}
             onLayout={() => flatListRef.current?.scrollToEnd()}
           />
         </View>
-        
+
         {/* Input Area */}
         <View style={styles.inputContainer}>
           <View style={styles.inputWrapper}>
@@ -160,18 +227,18 @@ const ChatScreen = ({ navigation, route }) => {
               <Ionicons name="camera" size={24} color="#075E54" />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               styles.sendButton,
-              inputText.trim() === '' && styles.sendButtonDisabled
+              inputText.trim() === '' && styles.sendButtonDisabled,
             ]}
             onPress={sendMessage}
             disabled={inputText.trim() === ''}
           >
-            <Ionicons 
-              name={inputText.trim() === '' ? "mic" : "send"} 
-              size={20} 
-              color="#fff" 
+            <Ionicons
+              name={inputText.trim() === '' ? 'mic' : 'send'}
+              size={20}
+              color="#fff"
             />
           </TouchableOpacity>
         </View>
