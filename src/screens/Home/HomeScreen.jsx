@@ -159,7 +159,7 @@ fetchUsers()
       onPress={() => handleUserPress(item)}
     >
       <View style={styles.avatarContainer}>
-        <Text style={styles.avatar}>{item.avatar}a</Text>
+        <Text style={styles.avatar}>{item.avatar}{item.name.slice(0,1)}</Text>
         {item.isOnline && <View style={styles.onlineIndicator} />}
       </View>
 

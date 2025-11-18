@@ -1,59 +1,421 @@
-// ChatScreen.js
 import React, { useState, useRef, useEffect } from 'react';
-import {View,Text,StyleSheet,SafeAreaView,TouchableOpacity,TextInput,FlatList,KeyboardAvoidingView,Platform,Image,StatusBar} from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+  Alert,
+  ActivityIndicator,
+  Image,
+  Modal,
+  PermissionsAndroid,
+} from 'react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import BaseUrl from '../../constant/Baseurl';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import { pick, types, isCancel } from '@react-native-documents/picker';
+import Sound from 'react-native-nitro-sound';
+import RNFS from 'react-native-fs';
+
 
 const ChatScreen = ({ navigation, route }) => {
   const { user, userName, userId } = route.params;
-  const [conversationId, setConversationId] = useState("");
+  const [conversationId, setConversationId] = useState('');
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [currentUserId, setCurrentUserId] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordTime, setRecordTime] = useState('00:00');
+  const [isUploading, setIsUploading] = useState(false);
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const flatListRef = useRef(null);
+  const recordingIntervalRef = useRef(null);
+  const recordingStartTimeRef = useRef(null);
+  const audioPathRef = useRef(null);
 
   const fetchMessages = async () => {
     const token = await AsyncStorage.getItem('authToken');
     try {
-      const { data } = await axios.get(`${BaseUrl}/${conversationId}/messages`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const { data } = await axios.get(
+        `${BaseUrl}/${conversationId}/messages`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
       console.log('Messages fetched:', data);
       setMessages(data);
     } catch (error) {
       console.error('Error fetching messages:', error);
     }
-  }
+  };
 
-  const sendMessage = async () => {
+  const sendMessage = async (messageData = null) => {
     try {
-      if (inputText.trim() === '') return;
+      const token = await AsyncStorage.getItem('authToken');
+
+      if (!messageData && inputText.trim() === '') return;
+
+      const formData = new FormData();
+
+      if (messageData) {
+        // Sending file/voice message
+        formData.append('type', messageData.type);
+        formData.append('text', messageData.text || '');
+
+        if (messageData.file) {
+          const fileObj = {
+            uri:
+              Platform.OS === 'ios'
+                ? messageData.file.uri.replace('file://', '')
+                : messageData.file.uri,
+            type: messageData.file.type,
+            name: messageData.file.name,
+          };
+          formData.append('files', fileObj);
+        }
+      } else {
+        // Sending text message
+        formData.append('text', inputText);
+        formData.append('type', 'text');
+      }
+
+      setIsUploading(true);
 
       const { data } = await axios.post(
         `${BaseUrl}/${conversationId}/messages/send`,
-        { text: inputText, type: 'text' },
+        formData,
         {
           headers: {
-            Authorization: `Bearer ${await AsyncStorage.getItem('authToken')}`,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
           },
         },
       );
+
       console.log('Message sent:', data);
       setInputText('');
-      // Refresh messages after sending
-      fetchMessages();
+      setIsUploading(false);
+      await fetchMessages();
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error sending message:', error.response?.data || error);
+      setIsUploading(false);
+      Alert.alert(
+        'Error',
+        error.response?.data?.error || 'Failed to send message',
+      );
     }
   };
 
+  // Image picker
+  const pickImage = () => {
+    setShowAttachmentMenu(false);
+    Alert.alert('Select Image', 'Choose image source', [
+      {
+        text: 'Camera',
+        onPress: () => {
+          launchCamera(
+            {
+              mediaType: 'photo',
+              quality: 0.8,
+              includeBase64: false,
+            },
+            handleImageResponse,
+          );
+        },
+      },
+      {
+        text: 'Gallery',
+        onPress: () => {
+          launchImageLibrary(
+            {
+              mediaType: 'photo',
+              quality: 0.8,
+              includeBase64: false,
+            },
+            handleImageResponse,
+          );
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const handleImageResponse = response => {
+    if (response.didCancel) {
+      console.log('User cancelled image picker');
+      return;
+    }
+    if (response.error) {
+      Alert.alert('Error', response.error);
+      return;
+    }
+
+    const asset = response.assets[0];
+    console.log('Image selected:', asset);
+
+    sendMessage({
+      type: 'image',
+      text: '',
+      file: {
+        uri: asset.uri,
+        type: asset.type || 'image/jpeg',
+        name: asset.fileName || `image_${Date.now()}.jpg`,
+      },
+    });
+  };
+
+  // Document picker
+  const pickDocument = async () => {
+    setShowAttachmentMenu(false);
+    try {
+      const results = await pick({
+        type: [types.allFiles],
+        allowMultiSelection: false,
+      });
+
+      const file = results[0];
+      console.log('Document selected:', file);
+
+      sendMessage({
+        type: 'document',
+        text: file.name,
+        file: {
+          uri: file.uri,
+          type: file.mimeType || 'application/octet-stream',
+          name: file.name,
+        },
+      });
+    } catch (err) {
+      if (isCancel(err)) {
+        console.log('User cancelled document picker');
+      } else {
+        Alert.alert('Error', 'Failed to pick document');
+        console.error(err);
+      }
+    }
+  };
+
+  // Format time for recording display
+  const formatTime = milliseconds => {
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds
+      .toString()
+      .padStart(2, '0')}`;
+  };
+
+  // Request audio permission
+  const requestAudioPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          {
+            title: 'Audio Recording Permission',
+            message: 'This app needs access to your microphone to record voice messages.',
+            buttonPositive: 'OK',
+          },
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn('Permission error:', err);
+        return false;
+      }
+    }
+    return true; // iOS handles permissions automatically
+  };
+
+
+
+
+const startRecording = async () => {
+  try {
+    console.log('Starting recording...');
+
+    const hasPermission = await requestAudioPermission();
+    if (!hasPermission) {
+      Alert.alert(
+        'Permission Required',
+        'Microphone permission is required to record voice messages.',
+      );
+      return;
+    }
+
+    // absolute, writable path
+    const audioPath = Platform.select({
+      ios: `${RNFS.DocumentDirectoryPath}/recording_${Date.now()}.m4a`,
+      android: `${RNFS.DocumentDirectoryPath}/recording_${Date.now()}.mp4`,
+    });
+
+    audioPathRef.current = audioPath;
+    console.log('Recording path:', audioPath);
+
+    // Example audioSet (cross-platform keys recommended)
+    const audioSet = {
+      // common
+      AudioSamplingRate: 44100,
+      AudioEncodingBitRate: 128000,
+      AudioChannels: 1,
+      // android-specific
+      AudioEncoderAndroid: Sound.AudioEncoderAndroidType?.AAC, // optional, if exposed
+      AudioSourceAndroid: Sound.AudioSourceAndroidType?.MIC,
+      // iOS-specific (if needed)
+      AVSampleRateKeyIOS: 44100,
+      AVFormatIDKeyIOS: Sound.AVEncodingOption?.aac,
+      AVEncoderAudioQualityKeyIOS: Sound.AVEncoderAudioQualityIOSType?.high,
+      AVNumberOfChannelsKeyIOS: 1,
+    };
+
+    // progress listener (keeps UI updated)
+    Sound.addRecordBackListener((e) => {
+      const currentTime = Math.floor(e.currentPosition);
+      setRecordTime(Sound.mmssss(currentTime));
+    });
+
+    // IMPORTANT: startRecorder takes (uri?, audioSet?, meteringEnabled?)
+    const resultUri = await Sound.startRecorder(audioPath, audioSet, true);
+    // resultUri is the saved file path (or default path if undefined passed)
+    console.log('Recording started, saved to:', resultUri);
+
+    setIsRecording(true);
+    recordingStartTimeRef.current = Date.now();
+  } catch (error) {
+    console.error('Error starting recording:', error);
+    Alert.alert('Recording Error', 'Failed to start recording. Please try again.');
+    setIsRecording(false);
+    setRecordTime('00:00');
+    Sound.removeRecordBackListener();
+  }
+};
+
+const stopRecording = async () => {
+  try {
+    const savedPath = await Sound.stopRecorder();
+    Sound.removeRecordBackListener();
+
+    console.log("Recording stopped, file saved at:", savedPath);
+
+    setIsRecording(false);
+    setRecordTime("00:00");
+
+    if (!savedPath) {
+      console.log("No audio file saved");
+      return;
+    }
+
+    const fileName = `voice_${Date.now()}.m4a`;
+
+    // SEND MESSAGE TO SERVER
+    sendMessage({
+      type: "audio",
+      text: "",
+      file: {
+        uri: Platform.OS === "android" ? `file://${savedPath}` : savedPath,
+        type: "audio/m4a",
+        name: fileName,
+      },
+    });
+  } catch (err) {
+    console.error("Stop recording error:", err);
+    Alert.alert("Error", "Failed to stop recording");
+  }
+};
+
+
+  // Cancel recording
+  const cancelRecording = async () => {
+    try {
+      console.log('Canceling recording...');
+
+      await Sound.stopRecorder();
+      Sound.removeRecordBackListener();
+
+      setIsRecording(false);
+      setRecordTime('00:00');
+
+      // Delete the recording file
+      if (audioPathRef.current) {
+        const fullPath = Platform.select({
+          ios: `${RNFS.DocumentDirectoryPath}/${audioPathRef.current}`,
+          android: `${RNFS.CachesDirectoryPath}/${audioPathRef.current}`,
+        });
+        
+        const exists = await RNFS.exists(fullPath);
+        if (exists) {
+          await RNFS.unlink(fullPath);
+          console.log('Recording file deleted');
+        }
+        audioPathRef.current = null;
+      }
+
+    } catch (error) {
+      console.error('Error canceling recording:', error);
+      setIsRecording(false);
+      setRecordTime('00:00');
+    }
+  };
+
+  // Play audio
+  const playAudio = async audioUrl => {
+    try {
+      console.log('Loading audio from:', audioUrl);
+
+      // Stop current playback if any
+      await Sound.stopPlayer();
+      Sound.removePlayBackListener();
+      Sound.removePlaybackEndListener();
+
+      // Set up playback listeners
+      Sound.addPlayBackListener((e) => {
+        console.log('Playback progress:', e.currentPosition, e.duration);
+      });
+
+      Sound.addPlaybackEndListener((e) => {
+        console.log('Playback completed');
+        Sound.removePlayBackListener();
+        Sound.removePlaybackEndListener();
+      });
+
+      // Start playback
+      await Sound.startPlayer(audioUrl);
+      console.log('Playback started');
+
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      Alert.alert('Error', 'Failed to play audio');
+    }
+  };
+
+  // Cleanup on unmount
   useEffect(() => {
-    if (flatListRef.current) {
-      flatListRef.current.scrollToEnd({ animated: true });
+    return () => {
+      // Clean up sound
+      Sound.stopPlayer();
+      Sound.removePlayBackListener();
+      Sound.removePlaybackEndListener();
+
+      // Clean up recorder
+      Sound.stopRecorder();
+      Sound.removeRecordBackListener();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (flatListRef.current && messages.length > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     }
   }, [messages]);
 
@@ -64,6 +426,9 @@ const ChatScreen = ({ navigation, route }) => {
       minute: '2-digit',
     });
 
+    const hasAttachment = item.attachments && item.attachments.length > 0;
+    const attachment = hasAttachment ? item.attachments[0] : null;
+
     return (
       <View
         style={[
@@ -71,14 +436,63 @@ const ChatScreen = ({ navigation, route }) => {
           isSent ? styles.sentMessage : styles.receivedMessage,
         ]}
       >
-        <Text
-          style={[
-            styles.messageText,
-            isSent ? styles.sentMessageText : styles.receivedMessageText,
-          ]}
-        >
-          {item.text}
-        </Text>
+        {attachment && attachment.type === 'image' && (
+          <Image
+            source={{ uri: `${BaseUrl}${attachment.url}` }}
+            style={styles.messageImage}
+            resizeMode="cover"
+          />
+        )}
+
+        {attachment && attachment.type === 'audio' && (
+          <TouchableOpacity
+            style={styles.audioContainer}
+            onPress={() => {
+              const audioUrl = `${BaseUrl}${attachment.url}`;
+              console.log('Playing audio:', audioUrl);
+              playAudio(audioUrl);
+            }}
+          >
+            <Ionicons name="play-circle" size={32} color="#075E54" />
+            <Text style={styles.audioText}>Voice message</Text>
+          </TouchableOpacity>
+        )}
+
+        {attachment && attachment.type === 'document' && (
+          <TouchableOpacity
+            style={styles.documentContainer}
+            onPress={() => {
+              Alert.alert(
+                'Document',
+                `${attachment.filename}\nSize: ${(
+                  attachment.size / 1024
+                ).toFixed(2)} KB`,
+              );
+            }}
+          >
+            <Ionicons name="document-text" size={32} color="#075E54" />
+            <View style={styles.documentInfo}>
+              <Text style={styles.documentText} numberOfLines={1}>
+                {attachment.filename}
+              </Text>
+              <Text style={styles.documentSize}>
+                {(attachment.size / 1024).toFixed(2)} KB
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {item.text && (
+          <Text
+            style={[
+              styles.messageText,
+              isSent ? styles.sentMessageText : styles.receivedMessageText,
+            ]}
+          >
+            {item.text}
+          </Text>
+        )}
+
         <Text
           style={[
             styles.timeText,
@@ -90,8 +504,6 @@ const ChatScreen = ({ navigation, route }) => {
       </View>
     );
   };
-
-  // ##################  ADD CONVERSATION   #######################
 
   const addConversation = async () => {
     const currentUserId = await AsyncStorage.getItem('userId');
@@ -115,21 +527,18 @@ const ChatScreen = ({ navigation, route }) => {
     }
   };
 
-  // ##################  GET CONVERSATION   #######################
-
   const getConversation = async () => {
     const token = await AsyncStorage.getItem('authToken');
     try {
-      const { data } = await axios.get(
-        `${BaseUrl}/conversation/get`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const { data } = await axios.get(`${BaseUrl}/conversation/get`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      );
-      setConversationId(data[0]?._id);
-      console.log('Conversation get:', data);
+      });
+      if (data && data.length > 0) {
+        setConversationId(data[0]._id);
+        console.log('Conversation ID set:', data[0]._id);
+      }
     } catch (error) {
       console.error('Error getting conversation:', error);
     }
@@ -148,6 +557,8 @@ const ChatScreen = ({ navigation, route }) => {
   useEffect(() => {
     if (conversationId) {
       fetchMessages();
+      const interval = setInterval(fetchMessages, 5000);
+      return () => clearInterval(interval);
     }
   }, [conversationId]);
 
@@ -202,14 +613,44 @@ const ChatScreen = ({ navigation, route }) => {
             keyExtractor={item => item._id}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.messagesList}
-            onLayout={() => flatListRef.current?.scrollToEnd()}
           />
+
+          {isUploading && (
+            <View style={styles.uploadingOverlay}>
+              <ActivityIndicator size="large" color="#075E54" />
+              <Text style={styles.uploadingText}>Sending...</Text>
+            </View>
+          )}
         </View>
+
+        {/* Recording Overlay */}
+        {isRecording && (
+          <View style={styles.recordingOverlay}>
+            <View style={styles.recordingContainer}>
+              <TouchableOpacity onPress={cancelRecording}>
+                <Ionicons name="trash" size={24} color="#ff0000" />
+              </TouchableOpacity>
+              <View style={styles.recordingInfo}>
+                <View style={styles.recordingDot} />
+                <Text style={styles.recordingTime}>{recordTime}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={stopRecording}
+                style={styles.stopButton}
+              >
+                <Ionicons name="send" size={24} color="#075E54" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Input Area */}
         <View style={styles.inputContainer}>
           <View style={styles.inputWrapper}>
-            <TouchableOpacity style={styles.attachmentButton}>
+            <TouchableOpacity
+              style={styles.attachmentButton}
+              onPress={() => setShowAttachmentMenu(true)}
+            >
               <Ionicons name="add" size={24} color="#075E54" />
             </TouchableOpacity>
             <TextInput
@@ -223,17 +664,20 @@ const ChatScreen = ({ navigation, route }) => {
             <TouchableOpacity style={styles.emojiButton}>
               <Ionicons name="happy" size={24} color="#075E54" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.cameraButton}>
+            <TouchableOpacity style={styles.cameraButton} onPress={pickImage}>
               <Ionicons name="camera" size={24} color="#075E54" />
             </TouchableOpacity>
           </View>
           <TouchableOpacity
-            style={[
-              styles.sendButton,
-              inputText.trim() === '' && styles.sendButtonDisabled,
-            ]}
-            onPress={sendMessage}
-            disabled={inputText.trim() === ''}
+            style={styles.sendButton}
+            onPress={() => {
+              if (inputText.trim() === '') {
+                startRecording();
+              } else {
+                sendMessage();
+              }
+            }}
+            onLongPress={startRecording}
           >
             <Ionicons
               name={inputText.trim() === '' ? 'mic' : 'send'}
@@ -243,6 +687,64 @@ const ChatScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Attachment Menu Modal */}
+      <Modal
+        visible={showAttachmentMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAttachmentMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowAttachmentMenu(false)}
+        >
+          <View style={styles.attachmentMenu}>
+            <TouchableOpacity
+              style={styles.attachmentOption}
+              onPress={pickDocument}
+            >
+              <View
+                style={[styles.attachmentIcon, { backgroundColor: '#9575CD' }]}
+              >
+                <Ionicons name="document" size={24} color="#fff" />
+              </View>
+              <Text style={styles.attachmentLabel}>Document</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.attachmentOption}
+              onPress={pickImage}
+            >
+              <View
+                style={[styles.attachmentIcon, { backgroundColor: '#EC407A' }]}
+              >
+                <Ionicons name="image" size={24} color="#fff" />
+              </View>
+              <Text style={styles.attachmentLabel}>Gallery</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.attachmentOption}
+              onPress={() => {
+                setShowAttachmentMenu(false);
+                launchCamera(
+                  { mediaType: 'photo', quality: 0.8 },
+                  handleImageResponse,
+                );
+              }}
+            >
+              <View
+                style={[styles.attachmentIcon, { backgroundColor: '#26C6DA' }]}
+              >
+                <Ionicons name="camera" size={24} color="#fff" />
+              </View>
+              <Text style={styles.attachmentLabel}>Camera</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -312,7 +814,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconButton: {
-    // padding: 8,
     marginLeft: 16,
   },
   chatContainer: {
@@ -354,6 +855,41 @@ const styles = StyleSheet.create({
   receivedMessageText: {
     color: '#000',
   },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  audioContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  audioText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#000',
+  },
+  documentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  documentInfo: {
+    marginLeft: 8,
+    flex: 1,
+  },
+  documentText: {
+    fontSize: 14,
+    color: '#000',
+    fontWeight: '600',
+  },
+  documentSize: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
   timeText: {
     fontSize: 11,
     marginTop: 4,
@@ -379,13 +915,13 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flex: 1,
     flexDirection: 'row',
-    // alignItems: 'flex-end',
     backgroundColor: '#fff',
     borderRadius: 24,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginRight: 12,
     maxHeight: 100,
+    alignItems: 'center',
   },
   textInput: {
     flex: 1,
@@ -413,8 +949,89 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sendButtonDisabled: {
-    backgroundColor: '#666',
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uploadingText: {
+    marginTop: 12,
+    color: '#fff',
+    fontSize: 16,
+  },
+  recordingOverlay: {
+    position: 'absolute',
+    bottom: 80,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  recordingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  recordingInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 20,
+  },
+  recordingDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#ff0000',
+    marginRight: 8,
+  },
+  recordingTime: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  stopButton: {
+    padding: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  attachmentMenu: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  attachmentOption: {
+    alignItems: 'center',
+  },
+  attachmentIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  attachmentLabel: {
+    fontSize: 12,
+    color: '#666',
   },
 });
 
