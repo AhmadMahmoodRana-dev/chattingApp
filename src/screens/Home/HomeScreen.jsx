@@ -130,6 +130,7 @@ fetchUsers()
       if (data) {
         Alert.alert('Success', 'Contact added successfully!');
         closeModal();
+        fetchUsers(); // Refresh the contacts list
       }
     } catch (error) {
       if (error.response) {
@@ -153,13 +154,30 @@ fetchUsers()
     });
   };
 
+  // Empty state component
+  const EmptyContacts = () => (
+    <View style={styles.emptyContainer}>
+      <View style={styles.emptyIllustration}>
+        <Ionicons name="people-outline" size={100} color="#e0e0e0" />
+        <View style={styles.emptyPlusIcon}>
+          <Ionicons name="add" size={30} color="#fff" />
+        </View>
+      </View>
+      <Text style={styles.emptyTitle}>No Contacts Yet</Text>
+      <Text style={styles.emptyDescription}>
+        Start connecting with friends and colleagues by adding them to your contacts list
+      </Text>
+      
+    </View>
+  );
+
   const renderUserItem = ({ item }) => (
     <TouchableOpacity
       style={styles.userItem}
       onPress={() => handleUserPress(item)}
     >
       <View style={styles.avatarContainer}>
-        <Text style={styles.avatar}>{item.avatar}{item.name.slice(0,1)}</Text>
+        <Text style={styles.avatar}>{item.name.slice(0,1)}</Text>
         {item.isOnline && <View style={styles.onlineIndicator} />}
       </View>
 
@@ -177,7 +195,7 @@ fetchUsers()
           see you at 5 pm
           </Text>
             <View style={styles.unreadBadge}>
-              <Text style={styles.unreadCount}>{item.unreadCount}2</Text>
+              <Text style={styles.unreadCount}>2</Text>
             </View>
         </View>
       </View>
@@ -221,14 +239,32 @@ fetchUsers()
         </TouchableOpacity>
       </View>
 
-      {/* Users List */}
-      <FlatList
-        data={filteredUsers}
-        renderItem={renderUserItem}
-        keyExtractor={item => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContainer}
-      />
+      {/* Users List or Empty State */}
+      {users.length === 0 && searchQuery === '' ? (
+        <EmptyContacts />
+      ) : (
+        <FlatList
+          data={filteredUsers}
+          renderItem={renderUserItem}
+          keyExtractor={item => item._id || item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.listContainer,
+            filteredUsers.length === 0 && styles.emptyListContainer
+          ]}
+          ListEmptyComponent={
+            searchQuery !== '' ? (
+              <View style={styles.noResultsContainer}>
+                <Ionicons name="search-outline" size={60} color="#e0e0e0" />
+                <Text style={styles.noResultsText}>No contacts found</Text>
+                <Text style={styles.noResultsDescription}>
+                  No contacts match "{searchQuery}"
+                </Text>
+              </View>
+            ) : null
+          }
+        />
+      )}
 
       {/* Floating Action Button - Opens Add Contact Modal */}
       <TouchableOpacity
@@ -391,6 +427,10 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingBottom: 10,
   },
+  emptyListContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -485,6 +525,68 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
+  },
+  // Empty State Styles
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyIllustration: {
+    position: 'relative',
+    marginBottom: 30,
+  },
+  emptyPlusIcon: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    backgroundColor: '#191717',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  emptyDescription: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 30,
+  },
+  // No Results Styles
+  noResultsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 100,
+  },
+  noResultsText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  noResultsDescription: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   // Bottom Modal Styles
   modalOverlay: {

@@ -109,62 +109,90 @@ const ChatScreen = ({ navigation, route }) => {
     }
   };
 
-  const pickImage = () => {
-    setShowAttachmentMenu(false);
-    Alert.alert('Select Image', 'Choose image source', [
-      {
-        text: 'Camera',
-        onPress: () => {
-          launchCamera(
-            {
-              mediaType: 'photo',
-              quality: 0.8,
-              includeBase64: false,
-            },
-            handleImageResponse,
+ const pickImage = async () => {
+  setShowAttachmentMenu(false);
+  Alert.alert('Select Image', 'Choose image source', [
+    {
+      text: 'Camera',
+      onPress: async () => {
+        const hasPermission = await requestCameraPermission();
+        if (!hasPermission) {
+          Alert.alert(
+            'Permission Required',
+            'Camera permission is required to take photos.',
           );
-        },
+          return;
+        }
+        
+        launchCamera(
+          {
+            mediaType: 'photo',
+            quality: 0.8,
+            includeBase64: false,
+            saveToPhotos: true,
+          },
+          handleImageResponse,
+        );
       },
-      {
-        text: 'Gallery',
-        onPress: () => {
-          launchImageLibrary(
-            {
-              mediaType: 'photo',
-              quality: 0.8,
-              includeBase64: false,
-            },
-            handleImageResponse,
-          );
-        },
+    },
+    {
+      text: 'Gallery',
+      onPress: () => {
+        launchImageLibrary(
+          {
+            mediaType: 'photo',
+            quality: 0.8,
+            includeBase64: false,
+          },
+          handleImageResponse,
+        );
       },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
+    },
+    { text: 'Cancel', style: 'cancel' },
+  ]);
+};
 
   const handleImageResponse = response => {
-    if (response.didCancel) {
-      console.log('User cancelled image picker');
-      return;
-    }
-    if (response.error) {
-      Alert.alert('Error', response.error);
-      return;
-    }
+  console.log("RESPONSE", response);
+  
+  // Check if user cancelled
+  if (response.didCancel) {
+    console.log('User cancelled image picker');
+    return;
+  }
+  
+  // Check for errors
+  if (response.error) {
+    Alert.alert('Error', response.error);
+    return;
+  }
+  
+  // Check if errorCode exists (another way the library reports errors)
+  if (response.errorCode) {
+    console.log('Error code:', response.errorCode);
+    Alert.alert('Error', response.errorMessage || 'Failed to capture image');
+    return;
+  }
 
-    const asset = response.assets[0];
-    console.log('Image selected:', asset);
+  // FIXED: Check if assets array exists and has items
+  if (!response.assets || response.assets.length === 0) {
+    console.log('No image selected or captured');
+    return;
+  }
 
-    sendMessage({
-      type: 'image',
-      text: '',
-      file: {
-        uri: asset.uri,
-        type: asset.type || 'image/jpeg',
-        name: asset.fileName || `image_${Date.now()}.jpg`,
-      },
-    });
-  };
+  const asset = response.assets[0];
+  console.log('Image selected:', asset);
+
+  sendMessage({
+    type: 'image',
+    text: '',
+    file: {
+      uri: asset.uri,
+      type: asset.type || 'image/jpeg',
+      name: asset.fileName || `image_${Date.now()}.jpg`,
+    },
+  });
+};
 
   const pickDocument = async () => {
     setShowAttachmentMenu(false);
@@ -195,6 +223,25 @@ const ChatScreen = ({ navigation, route }) => {
       }
     }
   };
+  const requestCameraPermission = async () => {
+  if (Platform.OS === 'android') {
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        {
+          title: 'Camera Permission',
+          message: 'This app needs access to your camera to take photos.',
+          buttonPositive: 'OK',
+        },
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (err) {
+      console.warn('Camera permission error:', err);
+      return false;
+    }
+  }
+  return true;
+};
 
   const requestAudioPermission = async () => {
     if (Platform.OS === 'android') {
