@@ -1,30 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  StatusBar,
-  Alert,
-  ActivityIndicator,
-  Image,
-  Modal,
-  PermissionsAndroid,
-} from 'react-native';
+import {View,Text,StyleSheet,TouchableOpacity,TextInput,FlatList,KeyboardAvoidingView,Platform,StatusBar,Alert,ActivityIndicator,Image,Modal,PermissionsAndroid} from 'react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import BaseUrl from '../../constant/Baseurl';
+import UploadBaseUrl from '../../constant/UploadBaseUrl';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 import Sound from 'react-native-nitro-sound';
 import RNFS from 'react-native-fs';
-
 
 const ChatScreen = ({ navigation, route }) => {
   const { user, userName, userId } = route.params;
@@ -36,10 +21,20 @@ const ChatScreen = ({ navigation, route }) => {
   const [recordTime, setRecordTime] = useState('00:00');
   const [isUploading, setIsUploading] = useState(false);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [playingAudioId, setPlayingAudioId] = useState(null);
   const flatListRef = useRef(null);
-  const recordingIntervalRef = useRef(null);
-  const recordingStartTimeRef = useRef(null);
   const audioPathRef = useRef(null);
+
+  // Helper function to construct full media URL
+  const getMediaUrl = (attachmentUrl) => {
+    if (!attachmentUrl) return '';
+    
+    // Remove leading slash if BaseUrl already ends with one
+    const cleanUrl = attachmentUrl.startsWith('/') ? attachmentUrl.slice(1) : attachmentUrl;
+    const cleanBaseUrl = UploadBaseUrl.endsWith('/') ? UploadBaseUrl.slice(0, -1) : UploadBaseUrl;
+    
+    return `${cleanBaseUrl}/${cleanUrl}`;
+  };
 
   const fetchMessages = async () => {
     const token = await AsyncStorage.getItem('authToken');
@@ -52,7 +47,7 @@ const ChatScreen = ({ navigation, route }) => {
           },
         },
       );
-      console.log('Messages fetched:', data);
+      console.log('Messages fetched:', data, conversationId);
       setMessages(data);
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -68,7 +63,6 @@ const ChatScreen = ({ navigation, route }) => {
       const formData = new FormData();
 
       if (messageData) {
-        // Sending file/voice message
         formData.append('type', messageData.type);
         formData.append('text', messageData.text || '');
 
@@ -84,7 +78,6 @@ const ChatScreen = ({ navigation, route }) => {
           formData.append('files', fileObj);
         }
       } else {
-        // Sending text message
         formData.append('text', inputText);
         formData.append('type', 'text');
       }
@@ -116,7 +109,6 @@ const ChatScreen = ({ navigation, route }) => {
     }
   };
 
-  // Image picker
   const pickImage = () => {
     setShowAttachmentMenu(false);
     Alert.alert('Select Image', 'Choose image source', [
@@ -174,7 +166,6 @@ const ChatScreen = ({ navigation, route }) => {
     });
   };
 
-  // Document picker
   const pickDocument = async () => {
     setShowAttachmentMenu(false);
     try {
@@ -205,17 +196,6 @@ const ChatScreen = ({ navigation, route }) => {
     }
   };
 
-  // Format time for recording display
-  const formatTime = milliseconds => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds
-      .toString()
-      .padStart(2, '0')}`;
-  };
-
-  // Request audio permission
   const requestAudioPermission = async () => {
     if (Platform.OS === 'android') {
       try {
@@ -233,107 +213,92 @@ const ChatScreen = ({ navigation, route }) => {
         return false;
       }
     }
-    return true; // iOS handles permissions automatically
+    return true;
   };
 
+  const startRecording = async () => {
+    try {
+      console.log('Starting recording...');
 
+      const hasPermission = await requestAudioPermission();
+      if (!hasPermission) {
+        Alert.alert(
+          'Permission Required',
+          'Microphone permission is required to record voice messages.',
+        );
+        return;
+      }
 
+      const audioPath = Platform.select({
+        ios: `${RNFS.DocumentDirectoryPath}/recording_${Date.now()}.m4a`,
+        android: `${RNFS.DocumentDirectoryPath}/recording_${Date.now()}.m4a`,
+      });
 
-const startRecording = async () => {
-  try {
-    console.log('Starting recording...');
+      audioPathRef.current = audioPath;
+      console.log('Recording path:', audioPath);
 
-    const hasPermission = await requestAudioPermission();
-    if (!hasPermission) {
-      Alert.alert(
-        'Permission Required',
-        'Microphone permission is required to record voice messages.',
-      );
-      return;
+      const audioSet = {
+        AudioSamplingRate: 44100,
+        AudioEncodingBitRate: 128000,
+        AudioChannels: 1,
+        AudioEncoderAndroid: Sound.AudioEncoderAndroidType?.AAC,
+        AudioSourceAndroid: Sound.AudioSourceAndroidType?.MIC,
+        AVSampleRateKeyIOS: 44100,
+        AVFormatIDKeyIOS: Sound.AVEncodingOption?.aac,
+        AVEncoderAudioQualityKeyIOS: Sound.AVEncoderAudioQualityIOSType?.high,
+        AVNumberOfChannelsKeyIOS: 1,
+      };
+
+      Sound.addRecordBackListener((e) => {
+        const currentTime = Math.floor(e.currentPosition);
+        setRecordTime(Sound.mmssss(currentTime));
+      });
+
+      const resultUri = await Sound.startRecorder(audioPath, audioSet, true);
+      console.log('Recording started, saved to:', resultUri);
+
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      Alert.alert('Recording Error', 'Failed to start recording. Please try again.');
+      setIsRecording(false);
+      setRecordTime('00:00');
+      Sound.removeRecordBackListener();
     }
+  };
 
-    // absolute, writable path
-    const audioPath = Platform.select({
-      ios: `${RNFS.DocumentDirectoryPath}/recording_${Date.now()}.m4a`,
-      android: `${RNFS.DocumentDirectoryPath}/recording_${Date.now()}.mp4`,
-    });
+  const stopRecording = async () => {
+    try {
+      const savedPath = await Sound.stopRecorder();
+      Sound.removeRecordBackListener();
 
-    audioPathRef.current = audioPath;
-    console.log('Recording path:', audioPath);
+      console.log("Recording stopped, file saved at:", savedPath);
 
-    // Example audioSet (cross-platform keys recommended)
-    const audioSet = {
-      // common
-      AudioSamplingRate: 44100,
-      AudioEncodingBitRate: 128000,
-      AudioChannels: 1,
-      // android-specific
-      AudioEncoderAndroid: Sound.AudioEncoderAndroidType?.AAC, // optional, if exposed
-      AudioSourceAndroid: Sound.AudioSourceAndroidType?.MIC,
-      // iOS-specific (if needed)
-      AVSampleRateKeyIOS: 44100,
-      AVFormatIDKeyIOS: Sound.AVEncodingOption?.aac,
-      AVEncoderAudioQualityKeyIOS: Sound.AVEncoderAudioQualityIOSType?.high,
-      AVNumberOfChannelsKeyIOS: 1,
-    };
+      setIsRecording(false);
+      setRecordTime("00:00");
 
-    // progress listener (keeps UI updated)
-    Sound.addRecordBackListener((e) => {
-      const currentTime = Math.floor(e.currentPosition);
-      setRecordTime(Sound.mmssss(currentTime));
-    });
+      if (!savedPath) {
+        console.log("No audio file saved");
+        return;
+      }
 
-    // IMPORTANT: startRecorder takes (uri?, audioSet?, meteringEnabled?)
-    const resultUri = await Sound.startRecorder(audioPath, audioSet, true);
-    // resultUri is the saved file path (or default path if undefined passed)
-    console.log('Recording started, saved to:', resultUri);
+      const fileName = `voice_${Date.now()}.m4a`;
 
-    setIsRecording(true);
-    recordingStartTimeRef.current = Date.now();
-  } catch (error) {
-    console.error('Error starting recording:', error);
-    Alert.alert('Recording Error', 'Failed to start recording. Please try again.');
-    setIsRecording(false);
-    setRecordTime('00:00');
-    Sound.removeRecordBackListener();
-  }
-};
-
-const stopRecording = async () => {
-  try {
-    const savedPath = await Sound.stopRecorder();
-    Sound.removeRecordBackListener();
-
-    console.log("Recording stopped, file saved at:", savedPath);
-
-    setIsRecording(false);
-    setRecordTime("00:00");
-
-    if (!savedPath) {
-      console.log("No audio file saved");
-      return;
+      sendMessage({
+        type: "audio",
+        text: "",
+        file: {
+          uri: Platform.OS === "android" ? `file://${savedPath}` : savedPath,
+          type: "audio/m4a",
+          name: fileName,
+        },
+      });
+    } catch (err) {
+      console.error("Stop recording error:", err);
+      Alert.alert("Error", "Failed to stop recording");
     }
+  };
 
-    const fileName = `voice_${Date.now()}.m4a`;
-
-    // SEND MESSAGE TO SERVER
-    sendMessage({
-      type: "audio",
-      text: "",
-      file: {
-        uri: Platform.OS === "android" ? `file://${savedPath}` : savedPath,
-        type: "audio/m4a",
-        name: fileName,
-      },
-    });
-  } catch (err) {
-    console.error("Stop recording error:", err);
-    Alert.alert("Error", "Failed to stop recording");
-  }
-};
-
-
-  // Cancel recording
   const cancelRecording = async () => {
     try {
       console.log('Canceling recording...');
@@ -344,21 +309,14 @@ const stopRecording = async () => {
       setIsRecording(false);
       setRecordTime('00:00');
 
-      // Delete the recording file
       if (audioPathRef.current) {
-        const fullPath = Platform.select({
-          ios: `${RNFS.DocumentDirectoryPath}/${audioPathRef.current}`,
-          android: `${RNFS.CachesDirectoryPath}/${audioPathRef.current}`,
-        });
-        
-        const exists = await RNFS.exists(fullPath);
+        const exists = await RNFS.exists(audioPathRef.current);
         if (exists) {
-          await RNFS.unlink(fullPath);
+          await RNFS.unlink(audioPathRef.current);
           console.log('Recording file deleted');
         }
         audioPathRef.current = null;
       }
-
     } catch (error) {
       console.error('Error canceling recording:', error);
       setIsRecording(false);
@@ -366,46 +324,55 @@ const stopRecording = async () => {
     }
   };
 
-  // Play audio
-  const playAudio = async audioUrl => {
+  // FIXED: Improved audio playback with proper URL handling
+  const playAudio = async (audioUrl, messageId) => {
     try {
-      console.log('Loading audio from:', audioUrl);
+      console.log('Attempting to play audio from:', audioUrl);
 
-      // Stop current playback if any
-      await Sound.stopPlayer();
-      Sound.removePlayBackListener();
-      Sound.removePlaybackEndListener();
+      // Stop any currently playing audio
+      if (playingAudioId) {
+        await Sound.stopPlayer();
+        Sound.removePlayBackListener();
+        Sound.removePlaybackEndListener();
+        setPlayingAudioId(null);
+      }
+
+      // If clicking the same audio that was playing, just stop it
+      if (playingAudioId === messageId) {
+        return;
+      }
 
       // Set up playback listeners
       Sound.addPlayBackListener((e) => {
-        console.log('Playback progress:', e.currentPosition, e.duration);
+        console.log('Playback progress:', e.currentPosition, '/', e.duration);
       });
 
       Sound.addPlaybackEndListener((e) => {
         console.log('Playback completed');
         Sound.removePlayBackListener();
         Sound.removePlaybackEndListener();
+        setPlayingAudioId(null);
       });
 
-      // Start playback
+      // Start playback with the full URL
       await Sound.startPlayer(audioUrl);
-      console.log('Playback started');
+      console.log('Playback started successfully');
+      setPlayingAudioId(messageId);
 
     } catch (error) {
       console.error('Error playing audio:', error);
-      Alert.alert('Error', 'Failed to play audio');
+      Alert.alert('Playback Error', 'Failed to play audio. Please try again.');
+      setPlayingAudioId(null);
+      Sound.removePlayBackListener();
+      Sound.removePlaybackEndListener();
     }
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Clean up sound
       Sound.stopPlayer();
       Sound.removePlayBackListener();
       Sound.removePlaybackEndListener();
-
-      // Clean up recorder
       Sound.stopRecorder();
       Sound.removeRecordBackListener();
     };
@@ -436,25 +403,47 @@ const stopRecording = async () => {
           isSent ? styles.sentMessage : styles.receivedMessage,
         ]}
       >
+        {/* FIXED: Image rendering with proper URL construction */}
         {attachment && attachment.type === 'image' && (
           <Image
-            source={{ uri: `${BaseUrl}${attachment.url}` }}
+            source={{ uri: getMediaUrl(attachment.url) }}
             style={styles.messageImage}
             resizeMode="cover"
+            onError={(error) => {
+              console.error('Image load error:', error.nativeEvent.error);
+              console.log('Failed URL:', getMediaUrl(attachment.url));
+            }}
+            onLoad={() => {
+              console.log('Image loaded successfully:', getMediaUrl(attachment.url));
+            }}
           />
         )}
 
+        {/* FIXED: Audio rendering with proper URL and playback state */}
         {attachment && attachment.type === 'audio' && (
           <TouchableOpacity
             style={styles.audioContainer}
             onPress={() => {
-              const audioUrl = `${BaseUrl}${attachment.url}`;
-              console.log('Playing audio:', audioUrl);
-              playAudio(audioUrl);
+              const audioUrl = getMediaUrl(attachment.url);
+              console.log('Playing audio from URL:', audioUrl);
+              playAudio(audioUrl, item._id);
             }}
           >
-            <Ionicons name="play-circle" size={32} color="#075E54" />
-            <Text style={styles.audioText}>Voice message</Text>
+            <Ionicons 
+              name={playingAudioId === item._id ? "pause-circle" : "play-circle"} 
+              size={32} 
+              color="#075E54" 
+            />
+            <View style={styles.audioInfo}>
+              <Text style={styles.audioText}>
+                {playingAudioId === item._id ? 'Playing...' : 'Voice message'}
+              </Text>
+              {attachment.size && (
+                <Text style={styles.audioSize}>
+                  {(attachment.size / 1024).toFixed(1)} KB
+                </Text>
+              )}
+            </View>
           </TouchableOpacity>
         )}
 
@@ -464,9 +453,7 @@ const stopRecording = async () => {
             onPress={() => {
               Alert.alert(
                 'Document',
-                `${attachment.filename}\nSize: ${(
-                  attachment.size / 1024
-                ).toFixed(2)} KB`,
+                `${attachment.filename}\nSize: ${(attachment.size / 1024).toFixed(2)} KB`,
               );
             }}
           >
@@ -860,16 +847,25 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 12,
     marginBottom: 4,
+    backgroundColor: '#f0f0f0',
   },
   audioContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    justifyContent:"",
+    gap:20,
+    width:150
   },
+  
   audioText: {
-    marginLeft: 8,
     fontSize: 14,
     color: '#000',
+    fontWeight: '500',
+  },
+  audioSize: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 2,
   },
   documentContainer: {
     flexDirection: 'row',
